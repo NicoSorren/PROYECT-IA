@@ -11,7 +11,13 @@ class AudioProcessor:
         self.input_folder = input_folder
         self.output_folder = output_folder
         self.silence_threshold = silence_threshold
-        self.zcr_results = defaultdict(lambda: {'zcr_promedios': [], 'zcr_maximos': []})
+        self.zcr_results = defaultdict(lambda: {
+            'zcr_promedios': [], 
+            'zcr_maximos': [], 
+            'amplitud_segmento_mayor': []  # Almacenar los segmentos con mayor amplitud
+        })
+        self.feature_matrix = []  # Para almacenar las características para PCA
+        self.labels = []          # Para almacenar las etiquetas (nombre de la verdura) de cada muestra
 
         os.makedirs(self.output_folder, exist_ok=True)
 
@@ -30,24 +36,40 @@ class AudioProcessor:
     def normalizar_audio(self, audio):
         return audio / np.abs(audio).max()
 
-    def calcular_zcr_segmentos(self, audio, sample_rate, num_segmentos=10):
+    def calcular_zcr_amplitud_segmentos(self, audio, sample_rate, num_segmentos=10):
         duracion_segmento = len(audio) // num_segmentos
         zcr_promedios = []
         zcr_maximos = []
+
+        amplitud_segmento_mayor = 0
+        segmento_con_mayor_amplitud = 0
 
         for i in range(num_segmentos):
             inicio = i * duracion_segmento
             fin = inicio + duracion_segmento if i < num_segmentos - 1 else len(audio)
             segmento = audio[inicio:fin]
-            zcr = librosa.feature.zero_crossing_rate(segmento)[0]
-            zcr_promedio = np.mean(zcr)
-            zcr_maximo = np.max(zcr)
-            zcr_promedios.append(zcr_promedio)
-            zcr_maximos.append(zcr_maximo)
 
-        zcr_promedio_global = np.mean(zcr_promedios)
-        zcr_maximo_global = np.max(zcr_maximos)
-        return zcr_promedio_global, zcr_maximo_global
+            # Calcular ZCR del segmento
+            zcr = librosa.feature.zero_crossing_rate(segmento)[0]
+            zcr_promedios.append(np.mean(zcr))
+            zcr_maximos.append(np.max(zcr))
+
+            # Calcular amplitud máxima del segmento
+            amplitud_maxima = np.max(np.abs(segmento))
+
+            # Identificar el segmento con la mayor amplitud
+            if amplitud_maxima > amplitud_segmento_mayor:
+                amplitud_segmento_mayor = amplitud_maxima
+                segmento_con_mayor_amplitud = i + 1  # +1 para contar desde 1
+
+        # Calcular valores globales para ZCR y registrar el segmento con mayor amplitud
+        caracteristicas = {
+            'zcr_promedio_global': np.mean(zcr_promedios),
+            'zcr_maximo_global': np.max(zcr_maximos),
+            'segmento_con_mayor_amplitud': segmento_con_mayor_amplitud
+        }
+
+        return caracteristicas
 
     def eliminar_silencios(self, archivo_audio):
         ruta_audio = os.path.join(self.input_folder, archivo_audio)
@@ -69,15 +91,24 @@ class AudioProcessor:
         # Normalizar el audio antes de guardar
         audio_normalizado = self.normalizar_audio(np.array(audio_sin_silencio))
 
-        # Calcular ZCR promedio y máximo globales de todos los segmentos
-        zcr_promedio_global, zcr_maximo_global = self.calcular_zcr_segmentos(audio_normalizado, sample_rate)
+        # Calcular características de ZCR y amplitud
+        caracteristicas = self.calcular_zcr_amplitud_segmentos(audio_normalizado, sample_rate)
 
         # Obtener el nombre de la verdura a partir del nombre del archivo (se asume formato "verdura_numero")
         nombre_verdura = archivo_audio.split("_")[0]
 
-        # Almacenar los resultados en el diccionario
-        self.zcr_results[nombre_verdura]['zcr_promedios'].append(zcr_promedio_global)
-        self.zcr_results[nombre_verdura]['zcr_maximos'].append(zcr_maximo_global)
+        # Almacenar los resultados en el diccionario y feature_matrix
+        self.zcr_results[nombre_verdura]['zcr_promedios'].append(caracteristicas['zcr_promedio_global'])
+        self.zcr_results[nombre_verdura]['zcr_maximos'].append(caracteristicas['zcr_maximo_global'])
+        self.zcr_results[nombre_verdura]['amplitud_segmento_mayor'].append(caracteristicas['segmento_con_mayor_amplitud'])
+        
+        # Guardar las características relevantes para PCA en feature_matrix
+        self.feature_matrix.append([
+            caracteristicas['zcr_promedio_global'],
+            caracteristicas['zcr_maximo_global'],
+            caracteristicas['segmento_con_mayor_amplitud']
+        ])
+        self.labels.append(nombre_verdura)
 
         nombre_salida = f"procesado_{archivo_audio.split('.')[0]}.wav"
         ruta_salida = os.path.join(self.output_folder, nombre_salida)
@@ -88,11 +119,14 @@ class AudioProcessor:
             if archivo.endswith((".wav", ".ogg")):
                 self.eliminar_silencios(archivo)
 
-        # Calcular e imprimir los promedios finales por verdura
+        # Calcular e imprimir los promedios finales por verdura, incluyendo el segmento promedio con mayor amplitud
         for verdura, datos in self.zcr_results.items():
             promedio_final_zcr = np.mean(datos['zcr_promedios'])
             maximo_final_zcr = np.mean(datos['zcr_maximos'])
+            segmento_promedio_mayor_amplitud = np.mean(datos['amplitud_segmento_mayor'])  # Promedio de los segmentos con mayor amplitud
+
             print(f"Verdura: {verdura} - ZCR Promedio Final: {promedio_final_zcr}, ZCR Máximo Final: {maximo_final_zcr}")
+            print(f"Segmento Promedio con Mayor Amplitud: {segmento_promedio_mayor_amplitud:.2f}")
 
 # Ejemplo de uso:
 input_folder = "AudiosOriginales"  
