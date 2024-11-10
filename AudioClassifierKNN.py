@@ -7,7 +7,7 @@ class AudioClassifierKNN:
         self.feature_matrix = feature_matrix
         self.labels = labels
         # Inicializamos el modelo KNN con 3 vecinos (puedes ajustar este número)
-        self.knn = KNeighborsClassifier(n_neighbors=3)
+        self.knn = KNeighborsClassifier(n_neighbors=9)
 
     def entrenar_modelo(self):
         # Dividimos los datos en un conjunto de entrenamiento (80%) y prueba (20%)
