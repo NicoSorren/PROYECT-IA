@@ -15,6 +15,7 @@ class FeatureExtractor:
         self.use_pca = use_pca
         self.n_components = n_components
         self.feature_length = 15
+        self.pca = None  # Inicializamos PCA como None
 
     def calcular_energia(self, audio):
         return np.sum(audio**2) / len(audio)
@@ -49,15 +50,22 @@ class FeatureExtractor:
         return features
 
     def procesar_audio(self, archivo_audio):
-        ruta_audio = os.path.join(self.input_folder, archivo_audio)
+        """Este método ahora permite procesar tanto archivos individuales como todos los archivos en la carpeta"""
+        if os.path.isdir(self.input_folder):
+            ruta_audio = os.path.join(self.input_folder, archivo_audio)  # Si es un directorio, se toma el archivo de allí
+        else:
+            ruta_audio = archivo_audio  # Si no es un directorio, se toma el archivo directamente
+
         try:
             audio, sample_rate = librosa.load(ruta_audio, sr=None)
+            print(f"Archivo cargado correctamente. Sample Rate: {sample_rate}")
         except Exception as e:
             print(f"Error al cargar {archivo_audio}: {e}")
             return
 
         energia = self.calcular_energia(audio)
-        nombre_verdura = archivo_audio.split("_")[1]
+        # Suponemos que el nombre del archivo sigue el formato 'procesado_<verdura>.wav'
+        nombre_verdura = archivo_audio.split("_")[1]  # Esto puede necesitar ajustes dependiendo del formato de nombre de archivo
 
         if nombre_verdura in ['berenjena', 'zanahoria']:
             caracteristicas = self.extraer_caracteristicas_berenjena_zanahoria(audio, sample_rate)
@@ -76,17 +84,22 @@ class FeatureExtractor:
         print(f"Audio: {archivo_audio} - Energía: {energia:.4f} - Características extraídas")
 
     def procesar_todos_los_audios(self):
-        for archivo in os.listdir(self.input_folder):
-            if archivo.endswith(".wav"):
-                self.procesar_audio(archivo)
+        """Este método ahora se puede usar tanto para un directorio de audios como para un solo archivo"""
+        if os.path.isdir(self.input_folder):
+            for archivo in os.listdir(self.input_folder):
+                if archivo.endswith(".wav"):
+                    self.procesar_audio(archivo)
+        else:
+            # Si la entrada no es una carpeta, procesamos un solo archivo
+            self.procesar_audio(self.input_folder)
         
         self.feature_matrix = np.array(self.feature_matrix)
         scaler = StandardScaler()
         self.feature_matrix = scaler.fit_transform(self.feature_matrix)
         
         if self.use_pca:
-            pca = PCA(n_components=self.n_components)
-            self.feature_matrix = pca.fit_transform(self.feature_matrix)
+            self.pca = PCA(n_components=self.n_components)
+            self.feature_matrix = self.pca.fit_transform(self.feature_matrix)
             print("PCA aplicado. Componentes retenidos:", self.n_components)
         
         return self.feature_matrix, self.labels
@@ -119,4 +132,3 @@ class FeatureExtractor:
         ax.set_zlabel("Componente principal 3")
         ax.legend()
         plt.show()
-

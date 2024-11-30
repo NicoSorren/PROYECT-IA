@@ -1,4 +1,3 @@
-
 import os
 import librosa
 import soundfile as sf
@@ -6,11 +5,15 @@ import noisereduce as nr
 import numpy as np
 
 class AudioProcessor:
-    def __init__(self, input_folder="AudiosOriginales", output_folder="AudiosProcesados", silence_threshold=30):
-        self.input_folder = input_folder
+    def __init__(self, input_folder="AudiosOriginales", output_folder="TempAudios", silence_threshold=30):
+        # Comprobar si la carpeta de salida 'AudiosProcesados' está vacía o no existe
+        if os.path.exists("AudiosProcesados") and len(os.listdir("AudiosProcesados")) > 0:
+            self.input_folder = "TempAudios"  # Tomar TempAudios si AudiosProcesados no está vacía
+        else:
+            self.input_folder = input_folder  # De lo contrario, usar AudiosOriginales
+        
         self.output_folder = output_folder
         self.silence_threshold = silence_threshold
-
         os.makedirs(self.output_folder, exist_ok=True)
 
     def reducir_ruido(self, audio, sample_rate):
@@ -50,6 +53,7 @@ class AudioProcessor:
         for archivo in os.listdir(self.input_folder):
             if archivo.endswith((".wav", ".ogg")):
                 self.eliminar_silencios(archivo)
+        
         print("Preprocesamiento completado.")
 
 if __name__ == "__main__":
