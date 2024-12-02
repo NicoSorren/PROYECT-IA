@@ -34,22 +34,34 @@ class FeatureExtractor:
         formants = positive_freqs[peaks] * sample_rate
         return formants[:2] if len(formants) >= 2 else [0, 0]
 
-    def extraer_caracteristicas_berenjena_zanahoria(self, audio, sample_rate, n_mfcc=13):
-        duracion_segmento = len(audio) // 3
-        inicio = audio[:duracion_segmento]
-        mfcc = librosa.feature.mfcc(y=inicio, sr=sample_rate, n_mfcc=n_mfcc)
-        mfcc_mean = np.mean(mfcc, axis=1)
-        formantes = self.calcular_formantes(inicio, sample_rate)
-        features = np.concatenate((mfcc_mean, formantes))
+    def extraer_caracteristicas(self, audio, sample_rate, n_mfcc=13):
+        """
+        Este método extrae características tanto para los audios de entrenamiento como para el audio de prueba.
+        Se elimina la segmentación del primer tercio y se agregan formantes a todos los audios.
+        """
+        # Dividir el audio en partes iguales (por ejemplo, en 3 partes)
+        num_segmentos = 3
+        segmento_duracion = len(audio) // num_segmentos
+        segmentos = [audio[i*segmento_duracion:(i+1)*segmento_duracion] for i in range(num_segmentos)]
+
+        # Extraer características de cada segmento
+        mfcc_features = []
+        for segmento in segmentos:
+            mfcc = librosa.feature.mfcc(y=segmento, sr=sample_rate, n_mfcc=n_mfcc)
+            mfcc_mean = np.mean(mfcc, axis=1)  # Tomar el promedio de los MFCC
+            mfcc_features.append(mfcc_mean)
+        
+        # Aplanar la lista de características MFCC
+        mfcc_features = np.concatenate(mfcc_features)
+
+        # Calcular formantes (siempre se agregan)
+        formantes = self.calcular_formantes(audio, sample_rate)
+        
+        # Concatenamos MFCC y formantes
+        features = np.concatenate((mfcc_features, formantes))
+        
         return features
 
-    def extraer_caracteristicas_generales(self, audio, sample_rate, n_mfcc=13):
-        mfcc = librosa.feature.mfcc(y=audio, sr=sample_rate, n_mfcc=n_mfcc)
-        mfcc_mean = np.mean(mfcc, axis=1)
-        zcr = librosa.feature.zero_crossing_rate(audio)
-        zcr_mean = np.mean(zcr)
-        features = np.concatenate((mfcc_mean, [zcr_mean]))
-        return features
     
     def procesar_todos_los_audios(self):
         """Este método ahora se puede usar tanto para un directorio de audios como para un solo archivo"""
@@ -89,30 +101,35 @@ class FeatureExtractor:
         if os.path.isdir(self.input_folder):
             ruta_audio = os.path.join(self.input_folder, archivo_audio)  # Ruta para los audios en carpeta
         else:
-            ruta_audio = self.input_folder  # Ruta directa para el archivo de prueba
+            try:
+                ruta_audio = self.input_folder  # Ruta directa para el archivo de prueba
+                print(f"ruta_audio es: {ruta_audio}")
+            except Exception as e:
+                print("No se ha podido modificar la ruta_audio para audio de prueba")
+
         try:
             audio, sample_rate = librosa.load(ruta_audio, sr=None)
+            print("Se ha aplicado librosa.load")
         except Exception as e:
             print(f"Error al cargar {ruta_audio}: {e}")
 
-        energia = self.calcular_energia(audio)   
+        try:
+            energia = self.calcular_energia(audio)   
+            print("se ha aplicado calcular_energia")
+        except Exception as e:
+            print("No se ha aplicado calcular_energia")
 
-        if os.path.isdir(self.input_folder):
-            nombre_verdura = archivo_audio.split("_")[1]  # Esto puede necesitar ajustes dependiendo del formato de nombre de archivo
-            if nombre_verdura in ['berenjena', 'zanahoria']:
-                caracteristicas = self.extraer_caracteristicas_berenjena_zanahoria(audio, sample_rate)
-            else:
-                caracteristicas = self.extraer_caracteristicas_generales(audio, sample_rate)
-        else:
-            try:
-                caracteristicas = self.extraer_caracteristicas_generales(audio, sample_rate)
-            except Exception as e:
-                print(f"no se pudo ejecutar extraer_caracteristicas_generales con archivo de prueba")
-            
         
-        features = [energia] + list(caracteristicas)
-        """Esta línea de código está ajustando la longitud del vector de características (features) para que tenga exactamente la longitud esperada, definida por self.feature_length
-        """
+        caracteristicas = self.extraer_caracteristicas(audio, sample_rate)      
+        
+        try:
+            features = [energia] + list(caracteristicas)
+            """Esta línea de código está ajustando la longitud del vector de características (features) para que tenga exactamente la longitud esperada, definida por self.feature_length
+            """
+            print("Se ha aplicado calcula de features (suma)")
+        except Exception as e:
+            print("NO se ha aplicado calcula de features (suma)")
+
         if len(features) < self.feature_length:
             features.extend([0] * (self.feature_length - len(features)))    #Se calcula cuántos elementos faltan: self.feature_length - len(features) y se Se añaden ceros ([0]) al final del vector para completar la longitud requerida.
         elif len(features) > self.feature_length:
@@ -120,12 +137,13 @@ class FeatureExtractor:
 
         if os.path.isdir(self.input_folder):
             self.feature_matrix.append(features)
-            self.labels.append(nombre_verdura)
+            self.labels.append(archivo_audio.split("_")[1])
             
         else:
             # Para el archivo de prueba, devolvemos las características directamente
             try:
                 features = np.array(features).reshape(1, -1)  # Reshape para tener la forma adecuada
+                print("Se ha podido aplicar np.array")
             except Exception as e:
                 print("No se ha podido aplicar np.array")
 

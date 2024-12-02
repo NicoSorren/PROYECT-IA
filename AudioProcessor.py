@@ -28,7 +28,9 @@ class AudioProcessor:
         """Eliminar silencios y reducir ruido"""
         ruta_audio = os.path.join(self.input_folder, archivo_audio)
         try:
+        # Aseguramos que estamos cargando el archivo correctamente
             audio, sample_rate = librosa.load(ruta_audio, sr=None)
+            print(f"Audio cargado correctamente: {archivo_audio}")
         except Exception as e:
             print(f"Error al cargar {archivo_audio}: {e}")
             return
