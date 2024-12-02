@@ -17,6 +17,7 @@ class FeatureExtractor:
         self.feature_length = 15
         self.pca = None  # Inicializamos PCA como None
         self.scaler = StandardScaler()  # Inicializamos el scaler. # StandardScaler estandariza los datos a una distribución con media 0 y desviación estándar 1.
+        self.feature_prueba = []
 
     def calcular_energia(self, audio):
         return np.sum(audio**2) / len(audio)
@@ -67,48 +68,30 @@ class FeatureExtractor:
             self.feature_matrix = np.array(self.feature_matrix)     # convierte self.feature_matrix (que hasta este punto es una lista de listas) en un array de NumPy.
             print(f"Características extraídas de {len(self.feature_matrix)} archivos.")
 
-            self.feature_matrix = self.scaler.fit_transform(self.feature_matrix) # fit_transform ajusta el scaler a los datos (calcula media y desviación estándar) y luego aplica la transformación.
-            print(f"self.feature_matrix queda como {self.feature_matrix}")
-            
-            if hasattr(self.scaler, 'mean_'):
-                print("El escalador está ajustado. Media:", self.scaler.mean_)
-            else:
-                print("El escalador NO está ajustado.")
+            self.feature_matrix = self.scaler.fit_transform(self.feature_matrix) # fit_transform ajusta el scaler a los datos (calcula media y desviación estándar) y luego aplica la transformación
 
             if self.use_pca:
                 self.pca = PCA(n_components=self.n_components)      # Si self.use_pca es True, aplica el algoritmo PCA para reducir el número de características (dimensiones) de los datos. n_components determina el número de dimensiones retenidas.
                 self.feature_matrix = self.pca.fit_transform(self.feature_matrix)   # fit_transform ajusta el PCA a los datos y los transforma, produciendo una nueva matriz donde cada fila representa un audio y cada columna representa un componente principal.
-                print(f"Las caracteristicas despues de PCA quedan como: {self.feature_matrix}")
                 print("PCA aplicado. Componentes retenidos:", self.n_components)
         
         else:
-            # Si la entrada no es una carpeta, procesamos un solo archivo
-            if hasattr(self.scaler, 'mean_'):
-                print("El escalador está ajustado. Media:", self.scaler.mean_)
-            else:
-                print("El escalador NO está ajustado.")
-
             try:
                 print(f"input_folder es: {self.input_folder}")
-                self.procesar_audio(self.input_folder)
-                print("Se ejecuto procesar_audio con audio de prueba")
+                self.feature_prueba = self.procesar_audio(self.input_folder)
             except Exception as e:
                 print("No se pudo ejecutar procesar_audios con audio de prueba")
                 
                                 
-        return self.feature_matrix, self.labels
+        return self.feature_matrix, self.labels, self.feature_prueba
 
     def procesar_audio(self, archivo_audio):
         if os.path.isdir(self.input_folder):
             ruta_audio = os.path.join(self.input_folder, archivo_audio)  # Ruta para los audios en carpeta
-            print("La ruta corresponde a la carpeta AudiosProcesados")
         else:
             ruta_audio = self.input_folder  # Ruta directa para el archivo de prueba
-            print("La ruta corresponde al archivo de prueba")
-
         try:
             audio, sample_rate = librosa.load(ruta_audio, sr=None)
-            print(f"Archivo cargado correctamente. Sample Rate: {sample_rate}")
         except Exception as e:
             print(f"Error al cargar {ruta_audio}: {e}")
 
@@ -123,14 +106,11 @@ class FeatureExtractor:
         else:
             try:
                 caracteristicas = self.extraer_caracteristicas_generales(audio, sample_rate)
-                print(f"se pudo ejecutar extraer_caracteristicas_generales con archivo de prueba, las caracteristicas son {caracteristicas}")
             except Exception as e:
                 print(f"no se pudo ejecutar extraer_caracteristicas_generales con archivo de prueba")
             
         
         features = [energia] + list(caracteristicas)
-        print(f"El tamaño de features es {len(features)}")
-
         """Esta línea de código está ajustando la longitud del vector de características (features) para que tenga exactamente la longitud esperada, definida por self.feature_length
         """
         if len(features) < self.feature_length:
@@ -146,7 +126,6 @@ class FeatureExtractor:
             # Para el archivo de prueba, devolvemos las características directamente
             try:
                 features = np.array(features).reshape(1, -1)  # Reshape para tener la forma adecuada
-                print(f"Se ha podido aplicar np.array, queda como {features}")
             except Exception as e:
                 print("No se ha podido aplicar np.array")
 
@@ -154,14 +133,12 @@ class FeatureExtractor:
                 if not hasattr(self.scaler, 'mean_'):
                     raise ValueError("El escalador no está ajustado. Asegúrate de procesar los datos de entrenamiento primero.")
                 features = self.scaler.transform(features)
-                print(f"Se ha podido aplicar transform, queda como {features}")
             except Exception as e:
                 print(f"No se ha podido aplicar transform: {e}")
             
             if self.pca:
                 try:
                     features = self.pca.transform(features)  # Si se aplica PCA, también se transforma
-                    print(f"Se ha podido aplicar PCA, features queda como: {features}")
                 except Exception as e:
                     print("No se ha podido aplicar PCA")
             print(f"Características extraídas y transformadas del archivo de prueba: {features}")
