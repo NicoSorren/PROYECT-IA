@@ -3,8 +3,11 @@ from FeatureExtractor import FeatureExtractor
 from KnnAlgorithm import KnnAlgorithm
 import os
 import numpy as np
+from LiveAudioProcessor import LiveAudioProcessor
 
 def main():
+
+
     # Paso 1: Procesar audios de entrenamiento en "AudiosProcesados"
     extractor = FeatureExtractor(input_folder="AudiosProcesados", use_pca=True, n_components=9)
     print("\nProcesando audios de entrenamiento...")
@@ -24,12 +27,12 @@ def main():
     clasificador.evaluate(features_entrenamiento, labels)  # Evaluamos con los mismos datos de entrenamiento
 
     # Paso 3: Procesar el archivo de audio de prueba 'papa_prueba.ogg' utilizando AudioProcessor
-    archivo_audio = "berenjena_prueba.ogg"
+    archivo_audio = "audio.ogg"
     procesador = AudioProcessor(input_folder="TempAudios", output_folder="TempAudios")
     procesador.eliminar_silencios(archivo_audio)  # Procesar el archivo y almacenarlo en TempAudios como .wav
 
     # Verificar si el archivo procesado está disponible
-    archivo_procesado = "TempAudios/procesado_berenjena_prueba.wav"
+    archivo_procesado = "TempAudios/procesado_audio.wav"
     if os.path.exists(archivo_procesado):
         print(f"El archivo procesado se ha guardado correctamente como {archivo_procesado}")
     else:
@@ -46,6 +49,7 @@ def main():
     # Paso 5: Usar el modelo entrenado KNN para predecir la palabra
     prediccion = clasificador.predict(features_prueba)  # Usamos las características del archivo de prueba
     print(f"\nLa palabra predicha es: {prediccion}")
+
 
 if __name__ == "__main__":
     main()
