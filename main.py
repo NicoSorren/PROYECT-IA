@@ -24,12 +24,12 @@ def main():
     clasificador.evaluate(features_entrenamiento, labels)  # Evaluamos con los mismos datos de entrenamiento
 
     # Paso 3: Procesar el archivo de audio de prueba 'papa_prueba.ogg' utilizando AudioProcessor
-    archivo_audio = "berenjena_prueba.ogg"
+    archivo_audio = "audio.ogg"
     procesador = AudioProcessor(input_folder="TempAudios", output_folder="TempAudios")
     procesador.eliminar_silencios(archivo_audio)  # Procesar el archivo y almacenarlo en TempAudios como .wav
 
     # Verificar si el archivo procesado está disponible
-    archivo_procesado = "TempAudios/procesado_berenjena_prueba.wav"
+    archivo_procesado = "TempAudios/procesado_audio.wav"
     if os.path.exists(archivo_procesado):
         print(f"El archivo procesado se ha guardado correctamente como {archivo_procesado}")
     else:
