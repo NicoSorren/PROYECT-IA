@@ -12,6 +12,7 @@ class ImageProcessorKMeans:
     def __init__(self, image_folder="ImagenesProcesadas", segmented_folder="ImagenesSegmentadas", k=3):
         self.image_folder = image_folder
         self.segmented_folder = segmented_folder
+        self.binarized_folder = "ImagenesBinarizadas"
         self.k = k
         self.image_processor = ImageProcessor()  # Instanciar ImageProcessor
         os.makedirs(self.segmented_folder, exist_ok=True)
@@ -123,6 +124,81 @@ class ImageProcessorKMeans:
         ax.set_title('Distribución de colores promedio por verdura')
         ax.legend()
         plt.show()
+
+    def extraer_caracteristicas_forma(self):
+        """
+        Extrae redondez y alargamiento de las imágenes binarizadas.
+        """
+        if not os.path.exists(self.binarized_folder):
+            print(f"Error: La carpeta '{self.binarized_folder}' no existe. Ejecuta primero el preprocesamiento binarizado.")
+            return
+
+        for verdura in os.listdir(self.binarized_folder):
+            ruta_verdura = os.path.join(self.binarized_folder, verdura)
+            if os.path.isdir(ruta_verdura):
+                print(f"\nCalculando redondez y alargamiento para: {verdura}")
+                for imagen_nombre in os.listdir(ruta_verdura):
+                    ruta_imagen = os.path.join(ruta_verdura, imagen_nombre)
+                    imagen_binarizada = cv2.imread(ruta_imagen, cv2.IMREAD_GRAYSCALE)
+                    if imagen_binarizada is not None:
+                        # Invertir la imagen si es necesario
+                        if np.mean(imagen_binarizada) > 127:  # Si el fondo es oscuro
+                            imagen_binarizada = cv2.bitwise_not(imagen_binarizada)
+
+                        # Filtrado adicional para cerrar agujeros
+                        kernel = np.ones((5, 5), np.uint8)
+                        imagen_binarizada = cv2.morphologyEx(imagen_binarizada, cv2.MORPH_CLOSE, kernel)
+
+                        # Mostrar imagen para verificar
+                        plt.imshow(imagen_binarizada, cmap="gray")
+                        plt.title(f"Imagen binarizada: {imagen_nombre}")
+                        plt.show()
+
+                        # Encontrar contornos externos
+                        contornos, _ = cv2.findContours(imagen_binarizada, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                        if len(contornos) > 0:
+                            contorno_principal = max(contornos, key=cv2.contourArea)
+
+                            # Calcular redondez
+                            area = cv2.contourArea(contorno_principal)
+                            perimetro = cv2.arcLength(contorno_principal, True)
+                            redondez = (4 * np.pi * area) / (perimetro ** 2) if perimetro > 0 else None
+
+                            # Calcular alargamiento usando la elipse ajustada
+                            if len(contorno_principal) >= 5:  # fitEllipse necesita al menos 5 puntos
+                                elipse = cv2.fitEllipse(contorno_principal)
+                                eje_mayor = max(elipse[1])
+                                eje_menor = min(elipse[1])
+                                alargamiento = eje_mayor / eje_menor if eje_menor > 0 else None
+                            else:
+                                alargamiento = None
+
+                            # Verificar si los valores son válidos
+                            if redondez is not None and alargamiento is not None:
+                                print(f"{imagen_nombre}: Redondez={redondez:.2f}, Alargamiento={alargamiento:.2f}")
+                                self.graficar_contornos(imagen_binarizada, contorno_principal, elipse)
+                            else:
+                                print(f"{imagen_nombre}: No se pudo calcular redondez o alargamiento.")
+                        else:
+                            print(f"{imagen_nombre}: No se encontraron contornos.")
+
+
+    def graficar_contornos(self, imagen_binarizada, contorno, elipse):
+        """
+        Visualiza los contornos y la elipse ajustada en la imagen binarizada.
+        """
+        imagen_color = cv2.cvtColor(imagen_binarizada, cv2.COLOR_GRAY2BGR)
+        cv2.drawContours(imagen_color, [contorno], -1, (0, 255, 0), 2)  # Contorno en verde
+        if elipse:
+            cv2.ellipse(imagen_color, elipse, (255, 0, 0), 2)  # Elipse en azul
+
+        plt.figure(figsize=(6, 6))
+        plt.imshow(cv2.cvtColor(imagen_color, cv2.COLOR_BGR2RGB))
+        plt.title("Contorno y Elipse Ajustada")
+        plt.axis("off")
+        plt.show()
+
+
     
     def predecir_imagen_nueva(self, temp_folder):
         """
@@ -185,3 +261,4 @@ if __name__ == "__main__":
     procesador.procesar_y_guardar_segmentadas()
     procesador.entrenar_y_evaluar()
     procesador.predecir_imagen_nueva(temp_folder="TempImagenes")
+    procesador.extraer_caracteristicas_forma()

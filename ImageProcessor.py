@@ -100,7 +100,7 @@ class ImageProcessor:
 
     def binarizar_adaptativa(self, imagen):
         """
-        Aplica binarización con filtro de ruido y contorno limpio.
+        Aplica binarización con filtro de ruido, contorno limpio y relleno de agujeros.
         """
         # Convertir a escala de grises
         gris = cv2.cvtColor(imagen, cv2.COLOR_RGB2GRAY)
@@ -112,9 +112,9 @@ class ImageProcessor:
         _, binarizada = cv2.threshold(suavizada, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         
         # Operaciones morfológicas
-        kernel = np.ones((3, 3), np.uint8)
-        apertura = cv2.morphologyEx(binarizada, cv2.MORPH_OPEN, kernel, iterations=2)
-        cierre = cv2.morphologyEx(apertura, cv2.MORPH_CLOSE, kernel, iterations=2)
+        kernel = np.ones((6, 6), np.uint8)  # Aumentar tamaño del kernel si es necesario
+        apertura = cv2.morphologyEx(binarizada, cv2.MORPH_OPEN, kernel, iterations=2)  # Eliminar ruido pequeño
+        cierre = cv2.morphologyEx(apertura, cv2.MORPH_CLOSE, kernel, iterations=3)  # Rellenar agujeros
         
         return cierre
     
