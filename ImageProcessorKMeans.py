@@ -13,6 +13,7 @@ class ImageProcessorKMeans:
         self.image_folder = image_folder
         self.segmented_folder = segmented_folder
         self.k = k
+        self.image_processor = ImageProcessor()  # Instanciar ImageProcessor
         os.makedirs(self.segmented_folder, exist_ok=True)
 
     def aplicar_kmeans(self, imagen):
@@ -122,7 +123,7 @@ class ImageProcessorKMeans:
         ax.set_title('Distribución de colores promedio por verdura')
         ax.legend()
         plt.show()
-
+    
     def predecir_imagen_nueva(self, temp_folder):
         """
         Carga una imagen nueva, la preprocesa, segmenta y predice la verdura.
@@ -142,6 +143,7 @@ class ImageProcessorKMeans:
                 print(f"Evaluando imagen: {imagen_nombre}")
                 
                 # Preprocesar imagen usando ImageProcessor
+                imagen_procesada = procesador.aplicar_transformaciones(imagen)
                 imagen_procesada = procesador.aplicar_transformaciones(imagen)
                 
                 # Aplicar K-Means para segmentar la imagen
@@ -175,6 +177,7 @@ class ImageProcessorKMeans:
                 plt.axis("off")
                 plt.show()
 
+    
 
 # Ejemplo de uso
 if __name__ == "__main__":

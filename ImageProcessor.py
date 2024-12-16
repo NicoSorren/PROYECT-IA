@@ -33,12 +33,12 @@ class ImageProcessor:
         """
         # Aumentar el contraste
         alpha = 1.3 # Factor de contraste (>1 aumenta el contraste)
-        beta = 10    # Valor de brillo
+        beta = 40    # Valor de brillo
         imagen = cv2.convertScaleAbs(imagen, alpha=alpha, beta=beta)
 
         # Aumentar la saturación
         hsv = cv2.cvtColor(imagen, cv2.COLOR_RGB2HSV)
-        hsv[:, :, 1] = cv2.add(hsv[:, :, 1], 30)  # Aumentar el canal de saturación
+        hsv[:, :, 1] = cv2.add(hsv[:, :, 1], 50)  # Aumentar el canal de saturación
         imagen = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
 
         # Redimensionar la imagen a 224x224
@@ -53,17 +53,28 @@ class ImageProcessor:
     def procesar_y_guardar(self, imagenes):
         """
         Aplica transformaciones y guarda las imágenes en la carpeta ImagenesProcesadas.
+        Devuelve un diccionario con imágenes procesadas.
         """
+        imagenes_procesadas = {}  # Diccionario para almacenar imágenes procesadas en memoria
+
         for verdura, lista_imagenes in imagenes.items():
             carpeta_destino = os.path.join(self.processed_folder, verdura)
             os.makedirs(carpeta_destino, exist_ok=True)
+
+            imagenes_procesadas[verdura] = []
+            
             for nombre, imagen in lista_imagenes:
                 # Aplicar transformaciones
                 imagen_procesada = self.aplicar_transformaciones(imagen)
+                imagenes_procesadas[verdura].append((nombre, imagen_procesada))  # Guardar en memoria
+                
                 # Guardar imagen procesada
                 ruta_guardado = os.path.join(carpeta_destino, nombre)
                 cv2.imwrite(ruta_guardado, cv2.cvtColor(imagen_procesada, cv2.COLOR_RGB2BGR))
                 print(f"Imagen guardada: {ruta_guardado}")
+        
+        return imagenes_procesadas  # Devuelve imágenes procesadas
+
 
     def mostrar_imagenes(self, imagenes, num_por_clase=3, procesadas=True):
         """
@@ -87,9 +98,52 @@ class ImageProcessor:
                 plt.axis("off")
             plt.show()
 
+    def binarizar_adaptativa(self, imagen):
+        """
+        Aplica binarización con filtro de ruido y contorno limpio.
+        """
+        # Convertir a escala de grises
+        gris = cv2.cvtColor(imagen, cv2.COLOR_RGB2GRAY)
+        
+        # Filtro Gaussiano para suavizar ruido
+        suavizada = cv2.GaussianBlur(gris, (5, 5), 0)
+        
+        # Binarización (Otsu)
+        _, binarizada = cv2.threshold(suavizada, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        
+        # Operaciones morfológicas
+        kernel = np.ones((3, 3), np.uint8)
+        apertura = cv2.morphologyEx(binarizada, cv2.MORPH_OPEN, kernel, iterations=2)
+        cierre = cv2.morphologyEx(apertura, cv2.MORPH_CLOSE, kernel, iterations=2)
+        
+        return cierre
+    
+    def procesar_y_guardar_binarizadas(self, imagenes, output_folder="ImagenesBinarizadas"):
+        """
+        Binariza y guarda las imágenes en una carpeta.
+        """
+        os.makedirs(output_folder, exist_ok=True)  # Crear carpeta si no existe
+        
+        for verdura, lista_imagenes in imagenes.items():
+            carpeta_destino = os.path.join(output_folder, verdura)
+            os.makedirs(carpeta_destino, exist_ok=True)
+            
+            for nombre, imagen in lista_imagenes:
+                # Binarizar imagen
+                imagen_binarizada = self.binarizar_adaptativa(imagen)
+                ruta_guardado = os.path.join(carpeta_destino, f"binarizada_{nombre}")
+                cv2.imwrite(ruta_guardado, imagen_binarizada)
+                print(f"Imagen binarizada guardada: {ruta_guardado}")
+                
 # Ejemplo de uso
 if __name__ == "__main__":
     procesador = ImageProcessor(image_folder="ImagenesVerduras", processed_folder="ImagenesProcesadas")
+    
+    # Cargar imágenes originales
     imagenes = procesador.cargar_imagenes()
-    procesador.mostrar_imagenes(imagenes, num_por_clase=3)
-    procesador.procesar_y_guardar(imagenes)
+    
+    # Procesar y guardar imágenes (con brillo, saturación, etc.)
+    imagenes_procesadas = procesador.procesar_y_guardar(imagenes)
+    
+    # Aplicar binarización sobre las imágenes procesadas
+    procesador.procesar_y_guardar_binarizadas(imagenes_procesadas)
