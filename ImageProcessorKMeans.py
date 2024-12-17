@@ -1,4 +1,4 @@
-from sklearn.cluster import KMeans
+from KMeansAlgorithm import KMeansManual
 import cv2
 import numpy as np
 import os
@@ -11,6 +11,7 @@ from collections import Counter
 from joblib import dump, load
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.preprocessing import StandardScaler
+from KMeansAlgorithm import KMeansManual  # Importar nuestra implementación manual
 
 class ImageProcessorKMeans:
     def __init__(self, image_folder="ImagenesProcesadas", segmented_folder="ImagenesSegmentadas", k=3):
@@ -18,25 +19,26 @@ class ImageProcessorKMeans:
         self.segmented_folder = segmented_folder
         self.binarized_folder = "ImagenesBinarizadas"
         self.k = k
+        self.kmeans = KMeansManual(n_clusters=self.k, max_iter=100, tol=1e-4)  # Instancia KMeansManual
         self.image_processor = ImageProcessor()  # Instanciar ImageProcessor
         os.makedirs(self.segmented_folder, exist_ok=True)
 
     def aplicar_kmeans(self, imagen):
         """
-        Aplica K-Means para segmentar la imagen en K clusters.
+        Aplica K-Means Manual para segmentar la imagen en K clusters.
         """
         original_shape = imagen.shape
         imagen_reshape = imagen.reshape((-1, 3))
 
-        # Aplicar K-Means
-        kmeans = KMeans(n_clusters=self.k, random_state=0)
-        kmeans.fit(imagen_reshape)
-        labels = kmeans.predict(imagen_reshape)
-        colores_centrales = kmeans.cluster_centers_
+        # Aplicar K-Means Manual
+        self.kmeans.fit(imagen_reshape)  # Ajustar KMeansManual a los datos
+        labels = self.kmeans.predict(imagen_reshape)  # Obtener etiquetas para cada punto
+        colores_centrales = self.kmeans.centroides  # Centroides como colores representativos
 
         # Reconstruir la imagen segmentada
         imagen_segmentada = colores_centrales[labels].reshape(original_shape)
         return imagen_segmentada.astype(np.uint8)
+
 
     def procesar_y_guardar_segmentadas(self):
         """
@@ -193,18 +195,22 @@ class ImageProcessorKMeans:
         dump(self.scaler_forma, "scaler_forma.pkl")
         print("Scalers guardados: scaler_color.pkl y scaler_forma.pkl")
 
-        # Entrenar KMeans
-        print("Entrenando modelo KMeans...")
-        kmeans = KMeans(n_clusters=self.k, random_state=0)
+        # Entrenar KMeansManual
+        print("Entrenando modelo KMeansManual...")
+        kmeans = KMeansManual(n_clusters=self.k, max_iter=100, tol=1e-4)
         kmeans.fit(caracteristicas_combinadas)
+
+        # Obtener las etiquetas asignadas
+        kmeans_labels = kmeans.predict(caracteristicas_combinadas)
 
         # Asignar etiquetas a clusters
         etiquetas_clusters = {}
         for i in range(self.k):
-            indices_cluster = np.where(kmeans.labels_ == i)
+            indices_cluster = np.where(kmeans_labels == i)
             etiquetas_reales = etiquetas[indices_cluster]
             etiqueta_mayoritaria = max(set(etiquetas_reales), key=list(etiquetas_reales).count)
             etiquetas_clusters[i] = etiqueta_mayoritaria
+
 
         # Guardar el modelo y etiquetas
         dump(kmeans, "kmeans_model.pkl")
@@ -302,4 +308,3 @@ if __name__ == "__main__":
     #procesador.procesar_y_guardar_segmentadas()
     procesador.entrenar_y_evaluar()
     procesador.predecir_imagen_nueva(temp_folder="TempImagenes")
-  
