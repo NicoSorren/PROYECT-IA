@@ -78,7 +78,6 @@ class FeatureExtractor:
                     self.procesar_audio(archivo)
             
             self.feature_matrix = np.array(self.feature_matrix)     # convierte self.feature_matrix (que hasta este punto es una lista de listas) en un array de NumPy.
-            print(f"Características extraídas de {len(self.feature_matrix)} archivos.")
 
             self.feature_matrix = self.scaler.fit_transform(self.feature_matrix) # fit_transform ajusta el scaler a los datos (calcula media y desviación estándar) y luego aplica la transformación
 
@@ -103,30 +102,23 @@ class FeatureExtractor:
         else:
             try:
                 ruta_audio = self.input_folder  # Ruta directa para el archivo de prueba
-                print(f"ruta_audio es: {ruta_audio}")
             except Exception as e:
                 print("No se ha podido modificar la ruta_audio para audio de prueba")
 
         try:
             audio, sample_rate = librosa.load(ruta_audio, sr=None)
-            print("Se ha aplicado librosa.load")
         except Exception as e:
             print(f"Error al cargar {ruta_audio}: {e}")
 
         try:
             energia = self.calcular_energia(audio)   
-            print("se ha aplicado calcular_energia")
         except Exception as e:
             print("No se ha aplicado calcular_energia")
-
-        
+     
         caracteristicas = self.extraer_caracteristicas(audio, sample_rate)      
         
         try:
             features = [energia] + list(caracteristicas)
-            """Esta línea de código está ajustando la longitud del vector de características (features) para que tenga exactamente la longitud esperada, definida por self.feature_length
-            """
-            print("Se ha aplicado calcula de features (suma)")
         except Exception as e:
             print("NO se ha aplicado calcula de features (suma)")
 
@@ -143,7 +135,6 @@ class FeatureExtractor:
             # Para el archivo de prueba, devolvemos las características directamente
             try:
                 features = np.array(features).reshape(1, -1)  # Reshape para tener la forma adecuada
-                print("Se ha podido aplicar np.array")
             except Exception as e:
                 print("No se ha podido aplicar np.array")
 
@@ -158,11 +149,8 @@ class FeatureExtractor:
                 try:
                     features = self.pca.transform(features)  # Si se aplica PCA, también se transforma
                 except Exception as e:
-                    print("No se ha podido aplicar PCA")
-            print(f"Características extraídas y transformadas del archivo de prueba: {features}")
-           
+                    print("No se ha podido aplicar PCA")          
         return features
-
 
     def visualizar_caracteristicas_3d_con_etiquetas(self, nombres_archivos):
         etiquetas = set(self.labels)

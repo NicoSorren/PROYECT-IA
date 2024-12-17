@@ -228,7 +228,10 @@ class ImageProcessorKMeans:
         if not os.listdir(temp_folder):
             print(f"Error: La carpeta '{temp_folder}' está vacía. Agrega una imagen para evaluar.")
             return
-
+        
+        # Crear carpeta para guardar imágenes etiquetadas
+        carpeta_etiquetada = "ImagenesEtiquetadas"
+        os.makedirs(carpeta_etiquetada, exist_ok=True)
         # Cargar modelo y scalers guardados
         print("Cargando modelo KMeans y scalers...")
         try:
@@ -297,14 +300,59 @@ class ImageProcessorKMeans:
                 prediccion = etiquetas_clusters.get(cluster, "Desconocido")
 
                 print(f"Predicción: {prediccion}")
-                plt.imshow(cv2.cvtColor(imagen_segmentada, cv2.COLOR_BGR2RGB))
-                plt.title(f"Predicción: {prediccion}")
-                plt.axis("off")
-                plt.show()
+
+                # Guardar imagen etiquetada
+                nombre_etiquetado = f"{prediccion}.jpg"
+                ruta_guardado = os.path.join(carpeta_etiquetada, nombre_etiquetado)
+                cv2.imwrite(ruta_guardado, imagen)
+                print(f"Imagen guardada como {ruta_guardado}")
+
+                # Mostrar las imágenes etiquetadas al final
+                #self.mostrar_imagenes_etiquetadas(carpeta_etiquetada)
+
+
+                #plt.imshow(cv2.cvtColor(imagen_segmentada, cv2.COLOR_BGR2RGB))
+                #plt.title(f"Predicción: {prediccion}")
+                #plt.axis("off")
+                #plt.show()
+        self.mostrar_imagenes_etiquetadas(carpeta_etiquetada)
+
+    def mostrar_imagenes_etiquetadas(self, carpeta_etiquetada):
+        """
+        Muestra todas las imágenes en la carpeta ImagenesEtiquetadas en una cuadrícula.
+        """
+        import matplotlib.pyplot as plt
+        import cv2
+
+        # Obtener todas las imágenes en la carpeta
+        imagenes = [img for img in os.listdir(carpeta_etiquetada) if img.endswith((".jpg", ".png"))]
+
+        if not imagenes:
+            print("No se encontraron imágenes etiquetadas.")
+            return
+
+        # Configurar la figura
+        num_imagenes = len(imagenes)
+        plt.figure(figsize=(12, 8))  # Tamaño de la figura
+
+        for i, imagen_nombre in enumerate(imagenes):
+            ruta_imagen = os.path.join(carpeta_etiquetada, imagen_nombre)
+            imagen = cv2.imread(ruta_imagen)
+            imagen = cv2.cvtColor(imagen, cv2.COLOR_BGR2RGB)  # Convertir a RGB
+
+            # Mostrar cada imagen en una cuadrícula
+            plt.subplot(2, 2, i + 1)  # 2 filas, 2 columnas
+            plt.imshow(imagen)
+            plt.title(imagen_nombre.split(".")[0])  # Mostrar solo el nombre sin la extensión
+            plt.axis("off")  # Ocultar ejes
+
+        plt.tight_layout()
+        plt.show()
+
 
 # Ejemplo de uso
 if __name__ == "__main__":
     procesador = ImageProcessorKMeans(image_folder="ImagenesProcesadas", segmented_folder="ImagenesSegmentadas", k=4)
     #procesador.procesar_y_guardar_segmentadas()
-    procesador.entrenar_y_evaluar()
+    #procesador.entrenar_y_evaluar()
     procesador.predecir_imagen_nueva(temp_folder="TempImagenes")

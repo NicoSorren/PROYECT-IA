@@ -10,11 +10,6 @@ def main():
     print("\nProcesando audios de entrenamiento...")
     features_entrenamiento, labels, _ = extractor.procesar_todos_los_audios()
 
-    # Mostrar características extraídas de los audios procesados
-    print("\nCaracterísticas extraídas de los audios de entrenamiento:")
-    for feature, label in zip(features_entrenamiento, labels):
-        print(f"{label}: {feature}")
-
     # Paso 2: Entrenar el modelo KNN con los audios de entrenamiento
     clasificador = KnnAlgorithm(k=4)  # Instancia del modelo KNN
     clasificador.fit(features_entrenamiento, labels)  # Entrenar modelo con las características extraídas
