@@ -89,7 +89,7 @@ class ImageProcessor:
         plt.figure(figsize=(15, 5 * total_clases))  # Tamaño de la ventana
 
         for idx, verdura in enumerate(clases):
-            print(f"Mostrando imágenes de: {verdura}")
+            #print(f"Mostrando imágenes de: {verdura}")
             carpeta_original = self.image_folder
             carpeta_procesada = self.processed_folder
             carpeta_binarizada = "ImagenesBinarizadas"
