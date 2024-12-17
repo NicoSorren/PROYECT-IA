@@ -1,82 +1,40 @@
-from AudioProcessor import AudioProcessor
-from FeatureExtractor import FeatureExtractor
-from KnnAlgorithm import KnnAlgorithm
 import os
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
+from AudioProcessor import AudioProcessor
+from FeatureExtractor import FeatureExtractor
+from KnnAlgorithm import KnnAlgorithm
 from ImageProcessorKMeans import ImageProcessorKMeans
+from ImageProcessor import ImageProcessor
 
-def main():
+def limpiar_carpeta(carpeta):
+    """Elimina todos los archivos dentro de una carpeta de forma segura."""
+    if os.path.exists(carpeta):
+        for archivo in os.listdir(carpeta):
+            ruta_archivo = os.path.join(carpeta, archivo)
+            try:
+                os.remove(ruta_archivo)
+            except Exception as e:
+                print(f"No se pudo eliminar {ruta_archivo}: {e}")
 
-
-
-    # Paso 1: Procesar audios de entrenamiento en "AudiosProcesados"
-    extractor = FeatureExtractor(input_folder="AudiosProcesados", use_pca=True, n_components=9)
-    print("\nProcesando audios de entrenamiento...")
-    features_entrenamiento, labels, _ = extractor.procesar_todos_los_audios()
-
-    # Paso 2: Entrenar el modelo KNN con los audios de entrenamiento
-    clasificador = KnnAlgorithm(k=4)  # Instancia del modelo KNN
-    clasificador.fit(features_entrenamiento, labels)  # Entrenar modelo con las características extraídas
-
-    # Guardar el modelo entrenado
-    clasificador.save_model("knn_model.pkl")
-    clasificador.evaluate(features_entrenamiento, labels)  # Evaluamos con los mismos datos de entrenamiento
-
-    carpeta = "C:/Users/nsorr/Desktop/PROJECT IA/TempAudios"
-    
+def renombrar_archivo(carpeta, prefijo="WhatsApp", nuevo_nombre="audio.ogg"):
+    """Renombra archivos en una carpeta que comienzan con un prefijo."""
     for archivo in os.listdir(carpeta):
-        if archivo.startswith("WhatsApp") and archivo.endswith(".ogg"):
-            nuevo_nombre = f"audio.ogg"
+        if archivo.startswith(prefijo) and archivo.endswith(".ogg"):
             try:
                 os.rename(os.path.join(carpeta, archivo), os.path.join(carpeta, nuevo_nombre))
                 print(f"Renombrado: {archivo} -> {nuevo_nombre}")
+                return os.path.join(carpeta, nuevo_nombre)
             except OSError as e:
                 print(f"Error al renombrar {archivo}: {e}")
+    return None
 
-            
-    # Paso 3: Procesar el archivo de audio de prueba 'papa_prueba.ogg' utilizando AudioProcessor
-    archivo_audio = "audio.ogg"
-    procesador = AudioProcessor(input_folder="TempAudios", output_folder="TempAudios")
-    procesador.eliminar_silencios(archivo_audio)  # Procesar el archivo y almacenarlo en TempAudios como .wav
-
-    # Verificar si el archivo procesado está disponible
-    archivo_procesado = "TempAudios/procesado_audio.wav"
-    if os.path.exists(archivo_procesado):
-        print(f"El archivo procesado se ha guardado correctamente como {archivo_procesado}")
-    else:
-        print(f"Error: El archivo procesado {archivo_procesado} no se ha guardado correctamente.")
-        return
-
-    # Paso 4: Extraer características del archivo procesado utilizando el extractor ajustado
-    print("\nProcesando el archivo de prueba...")
-    extractor.input_folder = archivo_procesado  # Cambiamos el input_folder al archivo de prueba
-    _, _, features_prueba = extractor.procesar_todos_los_audios()  # Extraemos las características
-
-    print("\nCaracterísticas del archivo de prueba transformadas por PCA:")
-
-    # Paso 5: Usar el modelo entrenado KNN para predecir la palabra
-    prediccion = clasificador.predict(features_prueba)  # Usamos las características del archivo de prueba
-    print(f"\nLa palabra predicha es: {prediccion}")
-
-    """Elimina todos los archivos dentro de una carpeta."""
-    carpeta = "TempAudios"
-    for archivo in os.listdir(carpeta):
-        ruta_archivo = os.path.join(carpeta, archivo)
-        try:
-            os.remove(ruta_archivo)  # Eliminar el archivo
-        except Exception as e:
-            print(f"No se pudo eliminar {ruta_archivo}: {e}")
-
-    # Paso 6: Mostrar la imagen correspondiente a la predicción
-    carpeta_imagenes_etiquetadas = "ImagenesEtiquetadas"
-    nombre_imagen = f"{prediccion}.jpg"  # Buscar la imagen con el nombre de la palabra predicha
-    ruta_imagen = os.path.join(carpeta_imagenes_etiquetadas, nombre_imagen)
-
+def mostrar_imagen_predicha(carpeta, nombre_imagen, prediccion):
+    """Muestra la imagen predicha basada en el nombre."""
+    ruta_imagen = os.path.join(carpeta, nombre_imagen)
     if os.path.exists(ruta_imagen):
         print(f"Mostrando imagen correspondiente a la predicción: {ruta_imagen}")
-        # Cargar y mostrar la imagen
         imagen = cv2.imread(ruta_imagen)
         if imagen is not None:
             plt.imshow(cv2.cvtColor(imagen, cv2.COLOR_BGR2RGB))
@@ -87,6 +45,64 @@ def main():
             print(f"No se pudo cargar la imagen {ruta_imagen}")
     else:
         print(f"No se encontró la imagen etiquetada para la predicción '{prediccion}'.")
+
+def main():
+    # Configuración de carpetas
+    carpeta_audios_temp = os.path.join(os.getcwd(), "TempAudios")
+    carpeta_imagenes_temp = os.path.join(os.getcwd(), "TempImagenes")
+    carpeta_imagenes_etiquetadas = os.path.join(os.getcwd(), "ImagenesEtiquetadas")
+    carpeta_imagenes_verduras = os.path.join(os.getcwd(), "ImagenesVerduras")
+    carpeta_imagenes_procesadas = os.path.join(os.getcwd(), "ImagenesProcesadas")
+
+    # Paso 1: Procesamiento de Imágenes
+    preprocesamiento_imagen = ImageProcessor(image_folder=carpeta_imagenes_verduras,
+                                             processed_folder=carpeta_imagenes_procesadas)
+    imagenes = preprocesamiento_imagen.cargar_imagenes()
+    imagenes_procesadas = preprocesamiento_imagen.procesar_y_guardar(imagenes)
+    preprocesamiento_imagen.procesar_y_guardar_binarizadas(imagenes_procesadas)
+
+    # Paso 2: Segmentación y Entrenamiento KMeans
+    procesador_kmeans = ImageProcessorKMeans(image_folder=carpeta_imagenes_procesadas)
+    print("\nProcesando y guardando segmentaciones...")
+    procesador_kmeans.procesar_y_guardar_segmentadas()
+    print("Entrenando modelo KMeans...")
+    procesador_kmeans.entrenar_y_evaluar()
+
+    print("\nPrediciendo nuevas imágenes...")
+    procesador_kmeans.predecir_imagen_nueva(temp_folder=carpeta_imagenes_temp)
+
+    # Paso 3: Procesamiento de Audios de Entrenamiento
+    extractor = FeatureExtractor(input_folder="AudiosProcesados", use_pca=True, n_components=9)
+    print("\nProcesando audios de entrenamiento...")
+    features_entrenamiento, labels, _ = extractor.procesar_todos_los_audios()
+
+    clasificador = KnnAlgorithm(k=4)
+    clasificador.fit(features_entrenamiento, labels)
+    clasificador.save_model("knn_model.pkl")
+    clasificador.evaluate(features_entrenamiento, labels)
+
+    # Paso 4: Procesar Audio de Prueba
+    renombrar_archivo(carpeta_audios_temp)
+    procesador_audio = AudioProcessor(input_folder=carpeta_audios_temp, output_folder=carpeta_audios_temp)
+    procesador_audio.eliminar_silencios("audio.ogg")
+    archivo_procesado = os.path.join(carpeta_audios_temp, "procesado_audio.wav")
+
+    if not os.path.exists(archivo_procesado):
+        print("Error: No se procesó el audio correctamente.")
+        return
+
+    # Paso 5: Predicción del Audio
+    extractor.input_folder = archivo_procesado
+    _, _, features_prueba = extractor.procesar_todos_los_audios()
+    prediccion = clasificador.predict(features_prueba)
+    print(f"\nLa palabra predicha es: {prediccion}")
+
+    # Paso 6: Mostrar Imagen Correspondiente
+    nombre_imagen = f"{prediccion}.jpg"
+    mostrar_imagen_predicha(carpeta_imagenes_etiquetadas, nombre_imagen, prediccion)
+
+    # Limpiar carpeta temporal
+    limpiar_carpeta(carpeta_audios_temp)
 
 if __name__ == "__main__":
     main()

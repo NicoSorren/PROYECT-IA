@@ -69,7 +69,7 @@ class KMeansManual:
 
             # Paso 3: Verificar convergencia
             if np.all(np.linalg.norm(nuevos_centroides - self.centroides, axis=1) < self.tol):
-                print(f"Convergencia alcanzada en {i + 1} iteraciones.")
+                #print(f"Convergencia alcanzada en {i + 1} iteraciones.")
                 break
 
             self.centroides = nuevos_centroides

@@ -4,14 +4,9 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D  # Para el grafico 3D
-from sklearn.metrics import accuracy_score
-from sklearn.model_selection import train_test_split
 from ImageProcessor import ImageProcessor
-from collections import Counter
 from joblib import dump, load
-from sklearn.preprocessing import MinMaxScaler
 from sklearn.preprocessing import StandardScaler
-from KMeansAlgorithm import KMeansManual  # Importar nuestra implementación manual
 
 class ImageProcessorKMeans:
     def __init__(self, image_folder="ImagenesProcesadas", segmented_folder="ImagenesSegmentadas", k=3):
@@ -23,22 +18,30 @@ class ImageProcessorKMeans:
         self.image_processor = ImageProcessor()  # Instanciar ImageProcessor
         os.makedirs(self.segmented_folder, exist_ok=True)
 
-    def aplicar_kmeans(self, imagen):
+    def aplicar_kmeans(self, imagen, return_details=False):
         """
-        Aplica K-Means Manual para segmentar la imagen en K clusters.
+        Aplica K-Means a una imagen para segmentarla.
+        Parámetros:
+            - imagen: La imagen de entrada en formato BGR.
+            - return_details: Si es True, devuelve la imagen segmentada, etiquetas y centroides.
         """
+        # Reorganizar la imagen como un conjunto de píxeles
         original_shape = imagen.shape
         imagen_reshape = imagen.reshape((-1, 3))
 
-        # Aplicar K-Means Manual
-        self.kmeans.fit(imagen_reshape)  # Ajustar KMeansManual a los datos
-        labels = self.kmeans.predict(imagen_reshape)  # Obtener etiquetas para cada punto
-        colores_centrales = self.kmeans.centroides  # Centroides como colores representativos
+        # Aplicar K-Means
+        self.kmeans.fit(imagen_reshape)
+        labels = self.kmeans.predict(imagen_reshape)
+        centroides = self.kmeans.centroides  # Centroides de los clústeres
 
         # Reconstruir la imagen segmentada
-        imagen_segmentada = colores_centrales[labels].reshape(original_shape)
-        return imagen_segmentada.astype(np.uint8)
+        imagen_segmentada = centroides[labels].reshape(original_shape).astype(np.uint8)
 
+        # Devolver detalles si se requiere
+        if return_details:
+            return imagen_segmentada, labels, centroides
+        else:
+            return imagen_segmentada
 
     def procesar_y_guardar_segmentadas(self):
         """
@@ -60,7 +63,60 @@ class ImageProcessorKMeans:
                         # Guardar la imagen segmentada
                         ruta_guardado = os.path.join(carpeta_destino, f"segmentada_{imagen_nombre}")
                         cv2.imwrite(ruta_guardado, cv2.cvtColor(imagen_segmentada, cv2.COLOR_RGB2BGR))
-                        print(f"Imagen segmentada guardada: {ruta_guardado}")
+                        #print(f"Imagen segmentada guardada: {ruta_guardado}")
+                        
+        # Procesar solo la primera imagen de la verdura
+            imagen_nombre = os.listdir(ruta_verdura)[0]  # Tomamos la primera imagen
+            ruta_imagen = os.path.join(ruta_verdura, imagen_nombre)
+            imagen = cv2.imread(ruta_imagen)
+
+            if imagen is not None:
+                # Aplicar K-Means
+                imagen_segmentada, labels, centroides = self.aplicar_kmeans(imagen, return_details=True)
+
+                # Guardar la imagen segmentada
+                ruta_guardado = os.path.join(carpeta_destino, f"segmentada_{imagen_nombre}")
+                cv2.imwrite(ruta_guardado, cv2.cvtColor(imagen_segmentada, cv2.COLOR_RGB2BGR))
+                print(f"Imagen segmentada guardada: {ruta_guardado}")
+
+                # Mostrar la imagen segmentada
+                plt.figure(figsize=(8, 6))
+                plt.imshow(cv2.cvtColor(imagen_segmentada, cv2.COLOR_BGR2RGB))
+                plt.title(f"Imagen Segmentada - {verdura}")
+                plt.axis("off")
+                plt.show()
+
+                # Visualizar distribución de clústeres en el espacio RGB
+                self.mostrar_distribucion_clusters(imagen, labels, centroides, verdura)
+
+    def mostrar_distribucion_clusters(self, imagen, labels, centroides, verdura):
+        """
+        Muestra la distribución de los clústeres en el espacio RGB, incluyendo los centroides marcados con una X.
+        """
+        imagen_flat = imagen.reshape((-1, 3))  # Aplanar la imagen en una lista de píxeles
+
+        fig = plt.figure(figsize=(10, 7))
+        ax = fig.add_subplot(111, projection='3d')
+
+        # Graficar cada clúster en el espacio RGB
+        for i, centroide in enumerate(centroides):
+            cluster_puntos = imagen_flat[labels == i]  # Puntos que pertenecen al clúster i
+            
+            # Graficar los puntos del clúster
+            ax.scatter(cluster_puntos[:, 0], cluster_puntos[:, 1], cluster_puntos[:, 2],
+                    color=np.array(centroide / 255).reshape(1, -1), 
+                    label=f'Clúster {i+1}', s=10, alpha=0.7)
+            
+            # Graficar el centroide con una X más grande
+            ax.scatter(centroide[0], centroide[1], centroide[2],
+                    color='black', s=100, marker='x', linewidths=2, label=f'Centroide {i+1}')
+
+        ax.set_title(f"Distribución de Clústeres y Centroides en Espacio RGB - {verdura}")
+        ax.set_xlabel("Rojo")
+        ax.set_ylabel("Verde")
+        ax.set_zlabel("Azul")
+        ax.legend()
+        plt.show()
 
     def extraer_caracteristicas_color(self, folder):
         """
@@ -95,7 +151,7 @@ class ImageProcessorKMeans:
         for verdura in os.listdir(self.binarized_folder):
             ruta_verdura = os.path.join(self.binarized_folder, verdura)
             if os.path.isdir(ruta_verdura):
-                print(f"\nCalculando redondez y alargamiento para: {verdura}")
+                #print(f"\nCalculando redondez y alargamiento para: {verdura}")
                 for imagen_nombre in os.listdir(ruta_verdura):
                     ruta_imagen = os.path.join(ruta_verdura, imagen_nombre)
                     imagen_binarizada = cv2.imread(ruta_imagen, cv2.IMREAD_GRAYSCALE)
@@ -144,7 +200,7 @@ class ImageProcessorKMeans:
                              #   print(f"{imagen_nombre}: No se pudo calcular redondez o alargamiento.")
                         else:
                             print(f"{imagen_nombre}: No se encontraron contornos.")
-            print(f"{np.array(caracteristicas)} ---- {np.array(etiquetas)}")
+            #print(f"{np.array(caracteristicas)} ---- {np.array(etiquetas)}")
         return np.array(caracteristicas), np.array(etiquetas)
 
     def graficar_contornos(self, imagen_binarizada, contorno, elipse):
@@ -353,6 +409,6 @@ class ImageProcessorKMeans:
 # Ejemplo de uso
 if __name__ == "__main__":
     procesador = ImageProcessorKMeans(image_folder="ImagenesProcesadas", segmented_folder="ImagenesSegmentadas", k=4)
-    #procesador.procesar_y_guardar_segmentadas()
-    #procesador.entrenar_y_evaluar()
+    procesador.procesar_y_guardar_segmentadas()
+    procesador.entrenar_y_evaluar()
     procesador.predecir_imagen_nueva(temp_folder="TempImagenes")

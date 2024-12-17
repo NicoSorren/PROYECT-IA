@@ -25,6 +25,7 @@ class ImageProcessor:
                         imagenes[verdura].append((imagen_nombre, imagen))  # Guardar nombre e imagen
                     else:
                         print(f"No se pudo cargar la imagen: {ruta_imagen}")
+                        
         return imagenes
 
     def aplicar_transformaciones(self, imagen):
@@ -71,32 +72,62 @@ class ImageProcessor:
                 # Guardar imagen procesada
                 ruta_guardado = os.path.join(carpeta_destino, nombre)
                 cv2.imwrite(ruta_guardado, cv2.cvtColor(imagen_procesada, cv2.COLOR_RGB2BGR))
-                print(f"Imagen guardada: {ruta_guardado}")
+                #print(f"Imagen guardada: {ruta_guardado}")
         
         return imagenes_procesadas  # Devuelve imágenes procesadas
 
 
-    def mostrar_imagenes(self, imagenes, num_por_clase=3, procesadas=True):
+    def mostrar_imagenes(self, imagenes, num_por_clase=1):
         """
-        Muestra un número específico de imágenes por clase (verdura).
-        Si procesadas es True, aplica transformaciones antes de mostrarlas.
+        Muestra imágenes originales, procesadas y binarizadas en una sola figura.
+        Cada fila representa una verdura y muestra las imágenes:
+        Original -> Procesada -> Binarizada.
         """
-        clases = list(imagenes.keys())
+        clases = list(imagenes.keys())  # Lista de nombres de verduras
         total_clases = len(clases)
-        
-        plt.figure(figsize=(15, 5 * total_clases))  # Ajustar el tamaño de la figura para mostrar todas las clases
-        
-        for verdura, lista_imagenes in imagenes.items():
+
+        plt.figure(figsize=(15, 5 * total_clases))  # Tamaño de la ventana
+
+        for idx, verdura in enumerate(clases):
             print(f"Mostrando imágenes de: {verdura}")
-            plt.figure(figsize=(15, 5))
-            for i, (_, imagen) in enumerate(lista_imagenes[:num_por_clase]):
-                if procesadas:
-                    imagen = self.aplicar_transformaciones(imagen)
-                plt.subplot(1, num_por_clase, i + 1)
-                plt.imshow(cv2.cvtColor(imagen, cv2.COLOR_BGR2RGB))
-                plt.title(f"{verdura} - {i + 1}")
+            carpeta_original = self.image_folder
+            carpeta_procesada = self.processed_folder
+            carpeta_binarizada = "ImagenesBinarizadas"
+
+            for i, (nombre, _) in enumerate(imagenes[verdura][:num_por_clase]):
+                # Rutas de las imágenes
+                ruta_original = os.path.join(carpeta_original, verdura, nombre)
+                ruta_procesada = os.path.join(carpeta_procesada, verdura, nombre)
+                ruta_binarizada = os.path.join(carpeta_binarizada, verdura, f"binarizada_{nombre}")
+                
+                # Leer imágenes
+                img_original = cv2.imread(ruta_original)
+                img_procesada = cv2.imread(ruta_procesada)
+                img_binarizada = cv2.imread(ruta_binarizada, cv2.IMREAD_GRAYSCALE)
+                
+                # Convertir imágenes a formato RGB para mostrar correctamente con matplotlib
+                img_original = cv2.cvtColor(img_original, cv2.COLOR_BGR2RGB)
+                img_procesada = cv2.cvtColor(img_procesada, cv2.COLOR_BGR2RGB)
+                
+                # Mostrar imágenes
+                plt.subplot(total_clases, num_por_clase * 3, idx * num_por_clase * 3 + i * 3 + 1)
+                plt.imshow(img_original)
+                plt.title(f"{verdura} - Original")
                 plt.axis("off")
-            plt.show()
+
+                plt.subplot(total_clases, num_por_clase * 3, idx * num_por_clase * 3 + i * 3 + 2)
+                plt.imshow(img_procesada)
+                plt.title(f"{verdura} - Procesada")
+                plt.axis("off")
+
+                plt.subplot(total_clases, num_por_clase * 3, idx * num_por_clase * 3 + i * 3 + 3)
+                plt.imshow(img_binarizada, cmap="gray")
+                plt.title(f"{verdura} - Binarizada")
+                plt.axis("off")
+
+        plt.tight_layout()
+        plt.show()
+
 
     def binarizar_adaptativa(self, imagen):
         """
@@ -133,7 +164,8 @@ class ImageProcessor:
                 imagen_binarizada = self.binarizar_adaptativa(imagen)
                 ruta_guardado = os.path.join(carpeta_destino, f"binarizada_{nombre}")
                 cv2.imwrite(ruta_guardado, imagen_binarizada)
-                print(f"Imagen binarizada guardada: {ruta_guardado}")
+                #print(f"Imagen binarizada guardada: {ruta_guardado}")
+        return imagen_binarizada
                 
 # Ejemplo de uso
 if __name__ == "__main__":
@@ -147,3 +179,5 @@ if __name__ == "__main__":
     
     # Aplicar binarización sobre las imágenes procesadas
     procesador.procesar_y_guardar_binarizadas(imagenes_procesadas)
+
+    procesador.mostrar_imagenes(imagenes, num_por_clase=1)
