@@ -7,6 +7,10 @@ from mpl_toolkits.mplot3d import Axes3D  # Para el grafico 3D
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 from ImageProcessor import ImageProcessor
+from collections import Counter
+from joblib import dump, load
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import StandardScaler
 
 class ImageProcessorKMeans:
     def __init__(self, image_folder="ImagenesProcesadas", segmented_folder="ImagenesSegmentadas", k=3):
@@ -74,61 +78,14 @@ class ImageProcessorKMeans:
                         etiquetas.append(verdura)
         return np.array(caracteristicas), np.array(etiquetas)
 
-    def entrenar_y_evaluar(self):
-        """
-        Divide el dataset en entrenamiento y evaluación, entrena KMeans y calcula precisión.
-        """
-        # Extraer características y etiquetas del dataset
-        caracteristicas, etiquetas = self.extraer_caracteristicas_color(self.segmented_folder)
-        
-        # Dividir en conjunto de entrenamiento y evaluación
-        X_train, X_test, y_train, y_test = train_test_split(caracteristicas, etiquetas, test_size=0.3, random_state=42)
-
-        # Aplicar KMeans al conjunto de entrenamiento
-        kmeans = KMeans(n_clusters=self.k, random_state=0)
-        kmeans.fit(X_train)
-
-        # Asignar etiquetas a clusters basados en la mayoría
-        etiquetas_clusters = {}
-        for i in range(self.k):
-            indices_cluster = np.where(kmeans.labels_ == i)
-            etiquetas_reales = y_train[indices_cluster]
-            etiqueta_mayoritaria = max(set(etiquetas_reales), key=list(etiquetas_reales).count)
-            etiquetas_clusters[i] = etiqueta_mayoritaria
-
-        # Evaluar el conjunto de evaluación
-        predicciones_clusters = kmeans.predict(X_test)
-        predicciones = [etiquetas_clusters[cluster] for cluster in predicciones_clusters]
-
-        # Calcular precisión
-        precision = accuracy_score(y_test, predicciones)
-        print(f"Precisión del modelo KMeans: {precision:.2f}")
-
-    def graficar_caracteristicas(self, caracteristicas):
-        """
-        Grafica las características RGB en un espacio 3D.
-        """
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-
-        colores = {'berenjena': 'purple', 'zanahoria': 'orange', 'papa': 'yellow', 'batata': 'brown'}
-
-        for verdura, lista_colores in caracteristicas.items():
-            lista_colores = np.array(lista_colores)
-            r, g, b = lista_colores[:, 0], lista_colores[:, 1], lista_colores[:, 2]
-            ax.scatter(r, g, b, label=verdura, color=colores.get(verdura, 'black'))
-
-        ax.set_xlabel('Rojo')
-        ax.set_ylabel('Verde')
-        ax.set_zlabel('Azul')
-        ax.set_title('Distribución de colores promedio por verdura')
-        ax.legend()
-        plt.show()
 
     def extraer_caracteristicas_forma(self):
         """
         Extrae redondez y alargamiento de las imágenes binarizadas.
         """
+        caracteristicas = []  # Lista para almacenar redondez y alargamiento
+        etiquetas = []  # Lista para almacenar etiquetas (nombre de la verdura)
+
         if not os.path.exists(self.binarized_folder):
             print(f"Error: La carpeta '{self.binarized_folder}' no existe. Ejecuta primero el preprocesamiento binarizado.")
             return
@@ -150,9 +107,9 @@ class ImageProcessorKMeans:
                         imagen_binarizada = cv2.morphologyEx(imagen_binarizada, cv2.MORPH_CLOSE, kernel)
 
                         # Mostrar imagen para verificar
-                        plt.imshow(imagen_binarizada, cmap="gray")
-                        plt.title(f"Imagen binarizada: {imagen_nombre}")
-                        plt.show()
+                        #plt.imshow(imagen_binarizada, cmap="gray")
+                        #plt.title(f"Imagen binarizada: {imagen_nombre}")
+                        #plt.show()
 
                         # Encontrar contornos externos
                         contornos, _ = cv2.findContours(imagen_binarizada, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -172,16 +129,21 @@ class ImageProcessorKMeans:
                                 alargamiento = eje_mayor / eje_menor if eje_menor > 0 else None
                             else:
                                 alargamiento = None
+                            
+                                # Guardar características y etiqueta
+                            caracteristicas.append([redondez, alargamiento])
+                            etiquetas.append(verdura)
 
                             # Verificar si los valores son válidos
-                            if redondez is not None and alargamiento is not None:
-                                print(f"{imagen_nombre}: Redondez={redondez:.2f}, Alargamiento={alargamiento:.2f}")
-                                self.graficar_contornos(imagen_binarizada, contorno_principal, elipse)
-                            else:
-                                print(f"{imagen_nombre}: No se pudo calcular redondez o alargamiento.")
+                            #if redondez is not None and alargamiento is not None:
+                             #   print(f"{imagen_nombre}: Redondez={redondez:.2f}, Alargamiento={alargamiento:.2f}")
+                              #  self.graficar_contornos(imagen_binarizada, contorno_principal, elipse)
+                            #else:
+                             #   print(f"{imagen_nombre}: No se pudo calcular redondez o alargamiento.")
                         else:
                             print(f"{imagen_nombre}: No se encontraron contornos.")
-
+            print(f"{np.array(caracteristicas)} ---- {np.array(etiquetas)}")
+        return np.array(caracteristicas), np.array(etiquetas)
 
     def graficar_contornos(self, imagen_binarizada, contorno, elipse):
         """
@@ -199,17 +161,79 @@ class ImageProcessorKMeans:
         plt.show()
 
 
-    
+
+    def entrenar_y_evaluar(self):
+        """
+        Extrae características de color y forma, las combina, normaliza y entrena KMeans.
+        """
+        print("Extrayendo características de color...")
+        caracteristicas_color, etiquetas_color = self.extraer_caracteristicas_color(self.segmented_folder)
+
+        print("Extrayendo características de forma...")
+        caracteristicas_forma, etiquetas_forma = self.extraer_caracteristicas_forma()
+
+        # Verificar si las etiquetas coinciden entre color y forma
+        if not np.array_equal(etiquetas_color, etiquetas_forma):
+            raise ValueError("Las etiquetas de color y forma no coinciden. Revisa el flujo de extracción.")
+
+        # Normalizar color y forma por separado
+        print("Normalizando características...")
+        self.scaler_color = StandardScaler().fit(caracteristicas_color)
+        self.scaler_forma = StandardScaler().fit(caracteristicas_forma)
+
+        caracteristicas_color_norm = self.scaler_color.transform(caracteristicas_color)
+        caracteristicas_forma_norm = self.scaler_forma.transform(caracteristicas_forma)
+
+        # Combinar características normalizadas
+        caracteristicas_combinadas = np.hstack((caracteristicas_color_norm, caracteristicas_forma_norm))
+        etiquetas = etiquetas_color  # Etiquetas comunes
+
+        # Guardar los scalers y el modelo
+        dump(self.scaler_color, "scaler_color.pkl")
+        dump(self.scaler_forma, "scaler_forma.pkl")
+        print("Scalers guardados: scaler_color.pkl y scaler_forma.pkl")
+
+        # Entrenar KMeans
+        print("Entrenando modelo KMeans...")
+        kmeans = KMeans(n_clusters=self.k, random_state=0)
+        kmeans.fit(caracteristicas_combinadas)
+
+        # Asignar etiquetas a clusters
+        etiquetas_clusters = {}
+        for i in range(self.k):
+            indices_cluster = np.where(kmeans.labels_ == i)
+            etiquetas_reales = etiquetas[indices_cluster]
+            etiqueta_mayoritaria = max(set(etiquetas_reales), key=list(etiquetas_reales).count)
+            etiquetas_clusters[i] = etiqueta_mayoritaria
+
+        # Guardar el modelo y etiquetas
+        dump(kmeans, "kmeans_model.pkl")
+        dump(etiquetas_clusters, "kmeans_labels.pkl")
+        print("Modelo guardado: kmeans_model.pkl y etiquetas guardadas: kmeans_labels.pkl")
+
+        print("Entrenamiento finalizado.")
+
+
     def predecir_imagen_nueva(self, temp_folder):
         """
-        Carga una imagen nueva, la preprocesa, segmenta y predice la verdura.
+        Carga una imagen nueva, la preprocesa, binariza, segmenta y predice la verdura utilizando un modelo KMeans guardado.
         """
-        # Verificar si la carpeta está vacía
+        # Verificar si la carpeta tiene imágenes
         if not os.listdir(temp_folder):
             print(f"Error: La carpeta '{temp_folder}' está vacía. Agrega una imagen para evaluar.")
             return
 
-        # Instanciar ImageProcessor para reutilizar los métodos de preprocesamiento
+        # Cargar modelo y scalers guardados
+        print("Cargando modelo KMeans y scalers...")
+        try:
+            kmeans = load("kmeans_model.pkl")
+            etiquetas_clusters = load("kmeans_labels.pkl")
+            scaler_color = load("scaler_color.pkl")
+            scaler_forma = load("scaler_forma.pkl")
+        except FileNotFoundError as e:
+            print(f"Error: {e}. Asegúrate de haber entrenado y guardado el modelo previamente.")
+            return
+
         procesador = ImageProcessor()
 
         for imagen_nombre in os.listdir(temp_folder):
@@ -218,47 +242,64 @@ class ImageProcessorKMeans:
             if imagen is not None:
                 print(f"Evaluando imagen: {imagen_nombre}")
                 
-                # Preprocesar imagen usando ImageProcessor
+                # Preprocesar imagen
                 imagen_procesada = procesador.aplicar_transformaciones(imagen)
-                imagen_procesada = procesador.aplicar_transformaciones(imagen)
-                
-                # Aplicar K-Means para segmentar la imagen
-                imagen_segmentada = self.aplicar_kmeans(imagen_procesada)
+                imagen_binarizada = procesador.binarizar_adaptativa(imagen_procesada)
 
-                # Extraer características
+                if imagen_binarizada is not None:
+                    # Invertir la imagen si es necesario
+                    if np.mean(imagen_binarizada) > 127:
+                        imagen_binarizada = cv2.bitwise_not(imagen_binarizada)
+
+                    kernel = np.ones((5, 5), np.uint8)
+                    imagen_binarizada = cv2.morphologyEx(imagen_binarizada, cv2.MORPH_CLOSE, kernel)
+
+                # Extraer características de forma
+                contornos, _ = cv2.findContours(imagen_binarizada, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                if len(contornos) > 0:
+                    contorno_principal = max(contornos, key=cv2.contourArea)
+                    area = cv2.contourArea(contorno_principal)
+                    perimetro = cv2.arcLength(contorno_principal, True)
+                    redondez = (4 * np.pi * area) / (perimetro ** 2) if perimetro > 0 else None
+                    if len(contorno_principal) >= 5:
+                        elipse = cv2.fitEllipse(contorno_principal)
+                        eje_mayor = max(elipse[1])
+                        eje_menor = min(elipse[1])
+                        alargamiento = eje_mayor / eje_menor if eje_menor > 0 else None
+                    else:
+                        alargamiento = None
+                else:
+                    print(f"{imagen_nombre}: No se encontraron contornos. Prueba con otra imagen.")
+                    return
+
+                # Extraer características de color
+                imagen_segmentada = self.aplicar_kmeans(imagen_procesada)
                 promedio_color = np.mean(imagen_segmentada, axis=(0, 1))
 
-                # Cargar características globales y entrenar modelo
-                caracteristicas, etiquetas = self.extraer_caracteristicas_color(self.segmented_folder)
-                kmeans = KMeans(n_clusters=self.k, random_state=0)
-                kmeans.fit(caracteristicas)
+                # Normalizar características por grupos
+                caracteristicas_color_norm = scaler_color.transform([promedio_color])
+                caracteristicas_forma_norm = scaler_forma.transform([[redondez, alargamiento]])
 
-                # Predecir cluster de la imagen nueva
-                cluster = kmeans.predict([promedio_color])[0]
+                # Combinar características normalizadas
+                caracteristicas_nueva = np.hstack([caracteristicas_color_norm, caracteristicas_forma_norm])
+                print(f"Características normalizadas: {caracteristicas_nueva}")
 
-                # Asignar etiqueta según cluster
-                etiquetas_clusters = {}
-                for i in range(self.k):
-                    indices_cluster = np.where(kmeans.labels_ == i)
-                    etiquetas_reales = etiquetas[indices_cluster]
-                    etiqueta_mayoritaria = max(set(etiquetas_reales), key=list(etiquetas_reales).count)
-                    etiquetas_clusters[i] = etiqueta_mayoritaria
+                # Predecir etiqueta
+                caracteristicas_nueva = np.array(caracteristicas_nueva).reshape(1, -1)
+                cluster = kmeans.predict(caracteristicas_nueva)[0]
 
-                prediccion = etiquetas_clusters[cluster]
-                print(f"La imagen fue clasificada como: {prediccion}")
+                prediccion = etiquetas_clusters.get(cluster, "Desconocido")
 
-                # Mostrar imagen segmentada 
+                print(f"Predicción: {prediccion}")
                 plt.imshow(cv2.cvtColor(imagen_segmentada, cv2.COLOR_BGR2RGB))
                 plt.title(f"Predicción: {prediccion}")
                 plt.axis("off")
                 plt.show()
 
-    
-
 # Ejemplo de uso
 if __name__ == "__main__":
     procesador = ImageProcessorKMeans(image_folder="ImagenesProcesadas", segmented_folder="ImagenesSegmentadas", k=4)
-    procesador.procesar_y_guardar_segmentadas()
+    #procesador.procesar_y_guardar_segmentadas()
     procesador.entrenar_y_evaluar()
     procesador.predecir_imagen_nueva(temp_folder="TempImagenes")
-    procesador.extraer_caracteristicas_forma()
+  
