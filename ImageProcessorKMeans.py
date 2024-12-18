@@ -1,3 +1,4 @@
+
 from KMeansAlgorithm import KMeansManual
 import cv2
 import numpy as np
@@ -37,14 +38,15 @@ class ImageProcessorKMeans:
 
     def procesar_y_guardar_segmentadas(self):
         """
-        Aplica K-Means a todas las imágenes y las guarda.
+        Aplica K-Means a todas las imágenes, guarda la imagen segmentada y muestra la primera imagen segmentada
+        de cada verdura al final del proceso.
         """
         for verdura in os.listdir(self.image_folder):
             ruta_verdura = os.path.join(self.image_folder, verdura)
             if os.path.isdir(ruta_verdura):
                 carpeta_destino = os.path.join(self.segmented_folder, verdura)
                 os.makedirs(carpeta_destino, exist_ok=True)
-
+                
                 for imagen_nombre in os.listdir(ruta_verdura):
                     ruta_imagen = os.path.join(ruta_verdura, imagen_nombre)
                     imagen = cv2.imread(ruta_imagen)
@@ -55,7 +57,24 @@ class ImageProcessorKMeans:
                         # Guardar la imagen segmentada
                         ruta_guardado = os.path.join(carpeta_destino, f"segmentada_{imagen_nombre}")
                         cv2.imwrite(ruta_guardado, cv2.cvtColor(imagen_segmentada, cv2.COLOR_RGB2BGR))
-                        #print(f"Imagen segmentada guardada: {ruta_guardado}")
+                print(f"Segmentación completada y guardada para: {verdura}")
+        
+        # Mostrar la primera imagen segmentada de cada verdura
+        print("\nMostrando la primera imagen segmentada de cada verdura:")
+        for verdura in os.listdir(self.segmented_folder):
+            ruta_segmentada_verdura = os.path.join(self.segmented_folder, verdura)
+            if os.path.isdir(ruta_segmentada_verdura):
+                imagenes_segmentadas = os.listdir(ruta_segmentada_verdura)
+                if imagenes_segmentadas:  # Asegurarse de que hay imágenes en la carpeta
+                    primera_imagen = os.path.join(ruta_segmentada_verdura, imagenes_segmentadas[0])
+                    imagen = cv2.imread(primera_imagen)
+                    if imagen is not None:
+                        plt.figure(figsize=(6, 6))
+                        plt.imshow(cv2.cvtColor(imagen, cv2.COLOR_BGR2RGB))
+                        plt.title(f"Primera imagen segmentada - {verdura}")
+                        plt.axis("off")
+                        plt.show()
+
 
     def extraer_caracteristicas_color(self, folder):
         """
@@ -74,7 +93,6 @@ class ImageProcessorKMeans:
                         caracteristicas.append(promedio_color)
                         etiquetas.append(verdura)
         return np.array(caracteristicas), np.array(etiquetas)
-
 
     def extraer_caracteristicas_forma(self):
         """
@@ -156,7 +174,34 @@ class ImageProcessorKMeans:
         plt.title("Contorno y Elipse Ajustada")
         plt.axis("off")
         plt.show()
+    def mostrar_distribucion_clusters(self, imagen, labels, centroides, verdura):
+        """
+        Muestra la distribución de los clústeres en el espacio RGB, incluyendo los centroides marcados con una X.
+        """
+        imagen_flat = imagen.reshape((-1, 3))  # Aplanar la imagen en una lista de píxeles
 
+        fig = plt.figure(figsize=(10, 7))
+        ax = fig.add_subplot(111, projection='3d')
+
+        # Graficar cada clúster en el espacio RGB
+        for i, centroide in enumerate(centroides):
+            cluster_puntos = imagen_flat[labels == i]  # Puntos que pertenecen al clúster i
+            
+            # Graficar los puntos del clúster
+            ax.scatter(cluster_puntos[:, 0], cluster_puntos[:, 1], cluster_puntos[:, 2],
+                    color=np.array(centroide / 255).reshape(1, -1), 
+                    label=f'Clúster {i+1}', s=10, alpha=0.7)
+            
+            # Graficar el centroide con una X más grande
+            ax.scatter(centroide[0], centroide[1], centroide[2],
+                    color='black', s=100, marker='x', linewidths=2, label=f'Centroide {i+1}')
+
+        ax.set_title(f"Distribución de Clústeres y Centroides en Espacio RGB - {verdura}")
+        ax.set_xlabel("Rojo")
+        ax.set_ylabel("Verde")
+        ax.set_zlabel("Azul")
+        ax.legend()
+        plt.show()
 
 
     def entrenar_y_evaluar(self):
@@ -300,16 +345,13 @@ class ImageProcessorKMeans:
                 nombre_etiquetado = f"{prediccion}.jpg"
                 ruta_guardado = os.path.join(carpeta_etiquetada, nombre_etiquetado)
                 cv2.imwrite(ruta_guardado, imagen)
-               # print(f"Imagen guardada como {ruta_guardado}")
-
-                # Mostrar las imágenes etiquetadas al final
-                #self.mostrar_imagenes_etiquetadas(carpeta_etiquetada)
+                print(f"Imagen guardada como {ruta_guardado}")
 
 
-                #plt.imshow(cv2.cvtColor(imagen_segmentada, cv2.COLOR_BGR2RGB))
-                #plt.title(f"Predicción: {prediccion}")
-                #plt.axis("off")
-                #plt.show()
+                plt.imshow(cv2.cvtColor(imagen, cv2.COLOR_BGR2RGB))
+                plt.title(f"Predicción: {prediccion}")
+                plt.axis("off")
+                plt.show()
         self.mostrar_imagenes_etiquetadas(carpeta_etiquetada)
 
     def mostrar_imagenes_etiquetadas(self, carpeta_etiquetada):

@@ -152,7 +152,7 @@ class FeatureExtractor:
                     print("No se ha podido aplicar PCA")          
         return features
 
-    def visualizar_caracteristicas_3d_con_etiquetas(self, nombres_archivos):
+    def visualizar_caracteristicas_3d(self, nombres_archivos):
         etiquetas = set(self.labels)
         colores = ['blue', 'orange', 'green', 'red']
         fig = plt.figure(figsize=(10, 7))

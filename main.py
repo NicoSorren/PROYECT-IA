@@ -53,23 +53,25 @@ def main():
     carpeta_imagenes_etiquetadas = os.path.join(os.getcwd(), "ImagenesEtiquetadas")
     carpeta_imagenes_verduras = os.path.join(os.getcwd(), "ImagenesVerduras")
     carpeta_imagenes_procesadas = os.path.join(os.getcwd(), "ImagenesProcesadas")
+    carpeta_imagenes_segmentendas = os.path.join(os.getcwd(), "ImagenesSegmentadas")
 
     # Paso 1: Procesamiento de Imágenes
-    preprocesamiento_imagen = ImageProcessor(image_folder=carpeta_imagenes_verduras,
-                                             processed_folder=carpeta_imagenes_procesadas)
+    preprocesamiento_imagen = ImageProcessor(image_folder="ImagenesVerduras",
+                                             processed_folder="ImagenesProcesadas")
     imagenes = preprocesamiento_imagen.cargar_imagenes()
     imagenes_procesadas = preprocesamiento_imagen.procesar_y_guardar(imagenes)
     preprocesamiento_imagen.procesar_y_guardar_binarizadas(imagenes_procesadas)
+    preprocesamiento_imagen.mostrar_imagenes(imagenes, num_por_clase=1)
 
     # Paso 2: Segmentación y Entrenamiento KMeans
-    procesador_kmeans = ImageProcessorKMeans(image_folder=carpeta_imagenes_procesadas)
+    procesador_kmeans = ImageProcessorKMeans(image_folder="ImagenesProcesadas", segmented_folder="ImagenesSegmentadas", k=4)
     print("\nProcesando y guardando segmentaciones...")
     procesador_kmeans.procesar_y_guardar_segmentadas()
     print("Entrenando modelo KMeans...")
     procesador_kmeans.entrenar_y_evaluar()
 
     print("\nPrediciendo nuevas imágenes...")
-    procesador_kmeans.predecir_imagen_nueva(temp_folder=carpeta_imagenes_temp)
+    procesador_kmeans.predecir_imagen_nueva(temp_folder="TempImagenes")
 
     # Paso 3: Procesamiento de Audios de Entrenamiento
     extractor = FeatureExtractor(input_folder="AudiosProcesados", use_pca=True, n_components=9)
